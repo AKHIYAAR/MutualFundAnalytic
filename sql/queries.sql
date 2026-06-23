@@ -5,7 +5,7 @@ SELECT DISTINCT fund_house, category, sub_category, risk_grade FROM fund_master;
 SELECT fm.scheme_code, fm.scheme_name, COUNT(nh.nav) as nav_records
 FROM fund_master fm
 LEFT JOIN nav_history nh ON fm.scheme_code = nh.scheme_code
-GROUP BY fm.scheme_code, fm.scheme_name;
+GROUP BY fm.scheme_code, fm.scheme_name
 
 -- 3. Calculate min, max, and average NAV for each scheme
 SELECT fm.scheme_name, MIN(nh.nav) as min_nav, MAX(nh.nav) as max_nav, AVG(nh.nav) as avg_nav
