@@ -3,18 +3,18 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 
 def main():
-    db_path = "data/processed/mutual_funds.db"
+    db_path = "Data/processed/mutual_funds.db"
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     
     # Create engine for SQLite
     engine = create_engine(f"sqlite:///{db_path}")
     
     # Load CSV files
-    fund_master_path = "data/processed/fund_master.csv"
-    nav_history_path = "data/processed/nav_history.csv"
+    fund_master_path = "Data/processed/fund_master.csv"
+    nav_history_path = "Data/processed/nav_history.csv"
     
     if not os.path.exists(fund_master_path) or not os.path.exists(nav_history_path):
-        print("Error: fund_master.csv or nav_history.csv missing in data/processed/.")
+        print("Error: fund_master.csv or nav_history.csv missing in Data/processed/.")
         return
 
     # 1. Execute schema.sql to set up tables with primary/foreign keys

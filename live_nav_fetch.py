@@ -21,7 +21,7 @@ def fetch_scheme_data(scheme_code, retries=3, backoff=3):
                 return None
 
 def main():
-    os.makedirs("data/raw", exist_ok=True)
+    os.makedirs("Data/raw", exist_ok=True)
     
     # Schemes specified in the prompt
     prompt_schemes = {
@@ -63,7 +63,7 @@ def main():
         df['scheme_name'] = meta.get('scheme_name', '')
         df = df[['scheme_code', 'scheme_name', 'date', 'nav']]
         
-        filepath = f"data/raw/{filename}"
+        filepath = f"Data/raw/{filename}"
         df.to_csv(filepath, index=False)
         print(f"Saved {len(df)} rows to {filepath}")
         
@@ -97,13 +97,13 @@ def main():
         
     # Generate and save fund_master.csv
     df_master = pd.DataFrame(master_records)
-    df_master.to_csv("data/raw/fund_master.csv", index=False)
-    print(f"Generated data/raw/fund_master.csv with {len(df_master)} records.")
+    df_master.to_csv("Data/raw/fund_master.csv", index=False)
+    print(f"Generated Data/raw/fund_master.csv with {len(df_master)} records.")
     
     # Generate and save nav_history.csv
     df_history = pd.concat(history_dfs, ignore_index=True)
-    df_history.to_csv("data/raw/nav_history.csv", index=False)
-    print(f"Generated data/raw/nav_history.csv with {len(df_history)} records.")
+    df_history.to_csv("Data/raw/nav_history.csv", index=False)
+    print(f"Generated Data/raw/nav_history.csv with {len(df_history)} records.")
 
 if __name__ == "__main__":
     main()

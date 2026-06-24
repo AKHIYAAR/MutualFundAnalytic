@@ -45,8 +45,8 @@ def check_nav_anomalies(df):
     return anomalies
 
 def load_and_inspect_datasets():
-    csv_files = glob.glob("data/raw/*.csv")
-    print(f"Found {len(csv_files)} CSV files in data/raw/\n")
+    csv_files = glob.glob("Data/raw/*.csv")
+    print(f"Found {len(csv_files)} CSV files in Data/raw/\n")
     
     inspection_results = {}
     
@@ -106,7 +106,7 @@ def load_and_inspect_datasets():
     return inspection_results
 
 def explore_fund_master():
-    fund_master_path = "data/raw/fund_master.csv"
+    fund_master_path = "Data/raw/fund_master.csv"
     if not os.path.exists(fund_master_path):
         print("fund_master.csv not found. Skipping exploration.")
         return None
@@ -146,8 +146,8 @@ def explore_fund_master():
     }
 
 def validate_amfi_codes():
-    fund_master_path = "data/raw/fund_master.csv"
-    nav_history_path = "data/raw/nav_history.csv"
+    fund_master_path = "Data/raw/fund_master.csv"
+    nav_history_path = "Data/raw/nav_history.csv"
     
     if not os.path.exists(fund_master_path) or not os.path.exists(nav_history_path):
         print("fund_master.csv or nav_history.csv missing. Skipping code validation.")
@@ -242,8 +242,8 @@ def generate_report(inspection, cleaned_inspection, master_info, validation):
         f.write("\n")
         
         # Data Cleaning Verification section
-        f.write("## 3. Cleaned Datasets Verification (data/processed/)\n\n")
-        f.write("The raw anomalies were corrected and saved to the `data/processed/` folder for database ingestion. Below is the quality check on the cleaned files:\n\n")
+        f.write("## 3. Cleaned Datasets Verification (Data/processed/)\n\n")
+        f.write("The raw anomalies were corrected and saved to the `Data/processed/` folder for database ingestion. Below is the quality check on the cleaned files:\n\n")
         f.write("| Cleaned Dataset | Rows | Columns | Remaining Anomalies | Actions Taken |\n")
         f.write("| --- | --- | --- | --- | --- |\n")
         
@@ -302,8 +302,8 @@ def clean_and_save_datasets():
     print("Cleaning Datasets")
     print("=" * 60)
     
-    os.makedirs("data/processed", exist_ok=True)
-    csv_files = glob.glob("data/raw/*.csv")
+    os.makedirs("Data/processed", exist_ok=True)
+    csv_files = glob.glob("Data/raw/*.csv")
     cleaned_inspection = {}
     
     for filepath in csv_files:
@@ -314,75 +314,133 @@ def clean_and_save_datasets():
         df = pd.read_csv(filepath)
         df_clean = df.copy()
         
-        # 100x shift correction for axis_bluechip_119092.csv (HDFC Money Market Fund)
+        # 1. Parse dates to datetime
+        df_clean['parsed_date'] = pd.to_datetime(df_clean['date'], format='%d-%m-%Y', errors='coerce')
+        df_clean = df_clean.dropna(subset=['parsed_date'])
+        
+        # 2. Validate NAV > 0 (replace <= 0 with NaN)
+        df_clean['nav'] = pd.to_numeric(df_clean['nav'], errors='coerce')
+        df_clean.loc[df_clean['nav'] <= 0.0, 'nav'] = np.nan
+        
+        # 3. Remove duplicates
+        df_clean = df_clean.drop_duplicates(subset=['parsed_date'])
+        
+        # Correct 100x shift for axis_bluechip_119092.csv (HDFC Money Market Fund)
         if filename == 'axis_bluechip_119092.csv':
-            df_clean['nav'] = pd.to_numeric(df_clean['nav'], errors='coerce')
-            parsed_dates = pd.to_datetime(df_clean['date'], format='%d-%m-%Y')
             cutoff_date = pd.to_datetime('30-08-2015', format='%d-%m-%Y')
-            mask = parsed_dates < cutoff_date
+            mask = df_clean['parsed_date'] < cutoff_date
             df_clean.loc[mask, 'nav'] = df_clean.loc[mask, 'nav'] * 100
             print(f"  - Corrected 100x shift in {filename} for {mask.sum()} rows prior to 30-08-2015.")
             
-        # Zero-NAV correction for icici_bluechip_120503.csv (Axis ELSS Tax Saver)
+        # Clean zero-NAV for icici_bluechip_120503.csv (Axis ELSS Tax Saver)
         elif filename == 'icici_bluechip_120503.csv':
-            df_clean['nav'] = pd.to_numeric(df_clean['nav'], errors='coerce')
-            mask_zero = df_clean['nav'] == 0.0
+            mask_zero = df_clean['nav'].isna()
             if mask_zero.any():
-                df_clean.loc[mask_zero, 'nav'] = np.nan
-                df_clean['parsed_date'] = pd.to_datetime(df_clean['date'], format='%d-%m-%Y')
                 df_clean = df_clean.sort_values('parsed_date')
                 df_clean['nav'] = df_clean['nav'].interpolate(method='linear')
-                # Sort back to descending date to match raw format
-                df_clean = df_clean.sort_values('parsed_date', ascending=False).drop(columns=['parsed_date']).reset_index(drop=True)
                 print(f"  - Cleaned zero NAV anomaly in {filename} on 07-04-2013 by linear interpolation.")
                 
-        # Save cleaned file to data/processed
-        cleaned_path = f"data/processed/{filename}"
-        df_clean.to_csv(cleaned_path, index=False)
+        # 4. Forward-fill missing NAV for holidays/weekends
+        min_date = df_clean['parsed_date'].min()
+        max_date = df_clean['parsed_date'].max()
+        full_range = pd.date_range(start=min_date, end=max_date, freq='D')
+        
+        df_clean = df_clean.set_index('parsed_date')
+        df_clean_reindexed = df_clean.reindex(full_range)
+        df_clean_reindexed.index.name = 'parsed_date'
+        df_clean_reindexed = df_clean_reindexed.reset_index()
+        
+        # Fill non-NAV columns
+        scheme_code = int(df['scheme_code'].iloc[0])
+        scheme_name = df['scheme_name'].iloc[0]
+        df_clean_reindexed['scheme_code'] = scheme_code
+        df_clean_reindexed['scheme_name'] = scheme_name
+        
+        # Forward fill NAV (and backward fill if any initial NaNs)
+        df_clean_reindexed['nav'] = df_clean_reindexed['nav'].ffill().bfill()
+        
+        # Reformat date column to string '%d-%m-%Y'
+        df_clean_reindexed['date'] = df_clean_reindexed['parsed_date'].dt.strftime('%d-%m-%Y')
+        df_clean_reindexed = df_clean_reindexed[['scheme_code', 'scheme_name', 'date', 'nav', 'parsed_date']]
+        
+        # Sort chronologically (ascending date)
+        df_clean_reindexed = df_clean_reindexed.sort_values('parsed_date').reset_index(drop=True)
+        df_clean_reindexed = df_clean_reindexed.drop(columns=['parsed_date'])
+        
+        # Save cleaned file to Data/processed
+        cleaned_path = f"Data/processed/{filename}"
+        df_clean_reindexed.to_csv(cleaned_path, index=False)
         
         # Verify if any anomalies remain
-        anoms = check_nav_anomalies(df_clean)
+        anoms = check_nav_anomalies(df_clean_reindexed)
         cleaned_inspection[filename] = {
-            "shape": df_clean.shape,
+            "shape": df_clean_reindexed.shape,
             "anomalies": anoms
         }
         
     # Clean nav_history.csv
-    nav_history_path = "data/raw/nav_history.csv"
+    nav_history_path = "Data/raw/nav_history.csv"
     if os.path.exists(nav_history_path):
         df_hist = pd.read_csv(nav_history_path)
         df_hist_clean = df_hist.copy()
+        
+        # 1. Parse dates to datetime
+        df_hist_clean['parsed_date'] = pd.to_datetime(df_hist_clean['date'], format='%d-%m-%Y', errors='coerce')
+        df_hist_clean = df_hist_clean.dropna(subset=['parsed_date'])
+        
+        # 2. Validate NAV > 0 (replace <= 0 with NaN)
         df_hist_clean['nav'] = pd.to_numeric(df_hist_clean['nav'], errors='coerce')
+        df_hist_clean.loc[df_hist_clean['nav'] <= 0.0, 'nav'] = np.nan
+        
+        # 3. Remove duplicates
+        df_hist_clean = df_hist_clean.drop_duplicates(subset=['scheme_code', 'parsed_date'])
         
         # Correct 100x shift for 119092
-        parsed_dates = pd.to_datetime(df_hist_clean['date'], format='%d-%m-%Y')
         cutoff_date = pd.to_datetime('30-08-2015', format='%d-%m-%Y')
-        mask_119092 = (df_hist_clean['scheme_code'] == 119092) & (parsed_dates < cutoff_date)
+        mask_119092 = (df_hist_clean['scheme_code'] == 119092) & (df_hist_clean['parsed_date'] < cutoff_date)
         df_hist_clean.loc[mask_119092, 'nav'] = df_hist_clean.loc[mask_119092, 'nav'] * 100
         
         # Correct zero-NAV for 120503
-        mask_120503_zero = (df_hist_clean['scheme_code'] == 120503) & (df_hist_clean['nav'] == 0.0)
+        mask_120503_zero = (df_hist_clean['scheme_code'] == 120503) & (df_hist_clean['nav'].isna())
         if mask_120503_zero.any():
-            df_hist_clean.loc[mask_120503_zero, 'nav'] = np.nan
-            
             # Interpolate per scheme
             history_dfs = []
             for code, group in df_hist_clean.groupby('scheme_code'):
-                group_sorted = group.copy()
-                group_sorted['parsed_date'] = pd.to_datetime(group_sorted['date'], format='%d-%m-%Y')
-                group_sorted = group_sorted.sort_values('parsed_date')
+                group_sorted = group.copy().sort_values('parsed_date')
                 if code == 120503:
                     group_sorted['nav'] = group_sorted['nav'].interpolate(method='linear')
-                group_sorted = group_sorted.drop(columns=['parsed_date'])
                 history_dfs.append(group_sorted)
             df_hist_clean = pd.concat(history_dfs, ignore_index=True)
             
-        cleaned_hist_path = "data/processed/nav_history.csv"
-        # Sort in descending order of date within each scheme to maintain parity
-        df_hist_clean['parsed_date'] = pd.to_datetime(df_hist_clean['date'], format='%d-%m-%Y')
-        df_hist_clean = df_hist_clean.sort_values(['scheme_code', 'parsed_date'], ascending=[True, False]).drop(columns=['parsed_date']).reset_index(drop=True)
+        # 4. Forward-fill missing NAV for holidays/weekends
+        history_dfs = []
+        for code, group in df_hist_clean.groupby('scheme_code'):
+            group_sorted = group.copy().sort_values('parsed_date')
+            min_date = group_sorted['parsed_date'].min()
+            max_date = group_sorted['parsed_date'].max()
+            full_range = pd.date_range(start=min_date, end=max_date, freq='D')
+            
+            group_sorted = group_sorted.set_index('parsed_date')
+            group_reindexed = group_sorted.reindex(full_range)
+            group_reindexed.index.name = 'parsed_date'
+            group_reindexed = group_reindexed.reset_index()
+            
+            group_reindexed['scheme_code'] = code
+            group_reindexed['nav'] = group_reindexed['nav'].ffill().bfill()
+            group_reindexed['date'] = group_reindexed['parsed_date'].dt.strftime('%d-%m-%Y')
+            
+            group_reindexed = group_reindexed[['scheme_code', 'date', 'nav', 'parsed_date']]
+            history_dfs.append(group_reindexed)
+            
+        df_hist_clean = pd.concat(history_dfs, ignore_index=True)
+        
+        # 5. Sort by amfi_code (scheme_code) + date (chronological)
+        df_hist_clean = df_hist_clean.sort_values(['scheme_code', 'parsed_date']).reset_index(drop=True)
+        df_hist_clean = df_hist_clean.drop(columns=['parsed_date'])
+        
+        cleaned_hist_path = "Data/processed/nav_history.csv"
         df_hist_clean.to_csv(cleaned_hist_path, index=False)
-        print("  - Generated data/processed/nav_history.csv with clean historical data.")
+        print("  - Generated Data/processed/nav_history.csv with clean, forward-filled daily data, sorted by scheme_code and date.")
         
         anoms = check_nav_anomalies(df_hist_clean)
         cleaned_inspection['nav_history.csv'] = {
@@ -391,17 +449,18 @@ def clean_and_save_datasets():
         }
         
     # Copy fund_master to processed
-    fund_master_raw_path = "data/raw/fund_master.csv"
+    fund_master_raw_path = "Data/raw/fund_master.csv"
     if os.path.exists(fund_master_raw_path):
         df_master = pd.read_csv(fund_master_raw_path)
-        df_master.to_csv("data/processed/fund_master.csv", index=False)
-        print("  - Copied fund_master.csv to data/processed/fund_master.csv.")
+        df_master.to_csv("Data/processed/fund_master.csv", index=False)
+        print("  - Copied fund_master.csv to Data/processed/fund_master.csv.")
         cleaned_inspection['fund_master.csv'] = {
             "shape": df_master.shape,
             "anomalies": []
         }
         
     return cleaned_inspection
+
 
 def main():
     inspection = load_and_inspect_datasets()

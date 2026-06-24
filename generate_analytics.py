@@ -6,7 +6,7 @@ import seaborn as sns
 from sqlalchemy import create_engine
 
 def main():
-    db_path = "data/processed/mutual_funds.db"
+    db_path = "Data/processed/mutual_funds.db"
     if not os.path.exists(db_path):
         print("Error: Database mutual_funds.db not found.")
         return
@@ -61,8 +61,8 @@ def main():
     # Calculate performance metrics
     metrics = []
     
-    # Risk-free rate (assumed 6% annualized, daily approx: 6% / 252)
-    rf_daily = 0.06 / 252
+    # Risk-free rate (assumed 6% annualized, daily approx: 6% / 365)
+    rf_daily = 0.06 / 365
     
     for col in df_pivot.columns:
         # Cumulative Return
@@ -75,11 +75,12 @@ def main():
         
         # Annualized Volatility
         daily_vol = df_returns[col].std()
-        ann_vol = daily_vol * np.sqrt(252)
+        ann_vol = daily_vol * np.sqrt(365)
         
         # Sharpe Ratio
         excess_returns = df_returns[col] - rf_daily
-        sharpe = (excess_returns.mean() / daily_vol) * np.sqrt(252) if daily_vol > 0 else 0
+        sharpe = (excess_returns.mean() / daily_vol) * np.sqrt(365) if daily_vol > 0 else 0
+
         
         # Maximum Drawdown
         running_max = df_pivot[col].cummax()
