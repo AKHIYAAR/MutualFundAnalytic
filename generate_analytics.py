@@ -15,14 +15,14 @@ def main():
     
     # Load nav history joined with master
     query = """
-        SELECT nh.scheme_code, fm.scheme_name, fm.fund_house, fm.category, nh.date, nh.nav
-        FROM nav_history nh
-        JOIN fund_master fm ON nh.scheme_code = fm.scheme_code
+        SELECT fn.scheme_code, df.scheme_name, df.fund_house, df.category, fn.date_key AS date, fn.nav
+        FROM fact_nav fn
+        JOIN dim_fund df ON fn.scheme_code = df.scheme_code
     """
     df = pd.read_sql(query, con=engine)
     
     # Parse date and sort
-    df['date'] = pd.to_datetime(df['date'], format='%d-%m-%Y')
+    df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d')
     df = df.sort_values(['scheme_name', 'date']).reset_index(drop=True)
     
     # Pivot to get date as index and scheme names as columns
