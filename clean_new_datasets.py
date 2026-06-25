@@ -56,18 +56,30 @@ def clean_return_val(val):
     except ValueError:
         return np.nan
 
-def clean_expense_ratio(val):
+def clean_expense_ratio(val, scheme_code=None):
     if val is None:
         return np.nan
     if not isinstance(val, str):
         if pd.isna(val):
             return np.nan
-        return float(val)
-    val_clean = val.strip().replace('%', '')
-    try:
-        return float(val_clean)
-    except ValueError:
-        return np.nan
+        ratio = float(val)
+    else:
+        val_clean = val.strip().replace('%', '')
+        if val_clean.upper() in ['N/A', 'NA', 'NULL', '']:
+            return np.nan
+        try:
+            ratio = float(val_clean)
+        except ValueError:
+            return np.nan
+            
+    # Clip to [0.1, 2.5] bounds
+    if ratio < 0.1:
+        print(f"  - Clipping low expense ratio for Scheme {scheme_code}: {ratio}% -> 0.1%")
+        ratio = 0.1
+    elif ratio > 2.5:
+        print(f"  - Clipping high expense ratio for Scheme {scheme_code}: {ratio}% -> 2.5%")
+        ratio = 2.5
+    return ratio
 
 def clean_transactions():
     raw_path = "Data/raw/investor_transactions.csv"
@@ -151,11 +163,12 @@ def clean_performance():
         for idx, row in anomalies.iterrows():
             print(f"    * ANOMALY: Scheme {row['scheme_code']} has {col} = {row[col]}% (Out of normal range -50% to 100%)")
             
-    # 3. Check expense_ratio range (0.1% - 2.5%)
-    df['expense_ratio'] = df['expense_ratio'].apply(clean_expense_ratio)
-    out_of_range_expense = df[(df['expense_ratio'] < 0.1) | (df['expense_ratio'] > 2.5)]
-    for idx, row in out_of_range_expense.iterrows():
-        print(f"    * EXPENSE RATIO OUT OF RANGE: Scheme {row['scheme_code']} has expense_ratio = {row['expense_ratio']}% (Normal: 0.1% to 2.5%)")
+    # 3. Check expense_ratio range (0.1% - 2.5%) and clip values
+    cleaned_ratios = []
+    for idx, row in df.iterrows():
+        ratio = clean_expense_ratio(row['expense_ratio'], row['scheme_code'])
+        cleaned_ratios.append(ratio)
+    df['expense_ratio'] = cleaned_ratios
         
     os.makedirs(os.path.dirname(processed_path), exist_ok=True)
     df.to_csv(processed_path, index=False)
