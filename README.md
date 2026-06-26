@@ -644,4 +644,27 @@ git commit -m "Day 2: Data cleaning and analytics complete"
 git commit -m "Day 3: Dashboard and reporting complete"
 ```
 
-This completes the end-to-end Mutual Fund Analytics project lifecycle, covering data acquisition, preprocessing, exploratory analysis, financial performance evaluation, risk assessment, dashboard development, and final reporting.
+### Day 3 (Continued): Advanced EDA & Interactive Visualizations
+
+```bash
+git commit -m "Day 3: Advanced EDA Analysis notebook with 16 charts, SQLite schema extension, pre-processing automation, and dynamic dashboard styling"
+```
+
+#### Objective
+Expand the analytics database to support comprehensive demographic, geographic, and holdings analyses, construct a quantitative Jupyter notebook with 16 Plotly & Seaborn visualisations, and integrate dynamic style modifications into the local web application.
+
+#### Key Enhancements
+*   **40 Scheme Expansion**: Simulated a synchronized market cycle dataset across 40 funds (Equity, Debt, Hybrid, and Other) from 2022 to 2026.
+*   **Database Scaling**: Modified `sql/schema.sql` and `sql_database_setup.py` to ingest:
+    *   `dim_investor`: Investor demographic profiles (age groups, genders, monthly ticket sizes).
+    *   `fact_holdings`: Individual fund sector allocations and weights.
+    *   `fact_market_stats`: Monthly retail flows (SIP inflows & folios).
+    *   `fact_aum_growth`: Grouped AUM by year (2022-2025).
+*   **Quantitative Notebook (`notebooks/EDA_Analysis.ipynb`)**: Developed 16 detailed plots (Plotly/Seaborn) analyzing cumulative returns, monthly SIP timelines (peaking at ₹31,002 Cr in Dec 2025), folio growth (to 26.12 Cr), state-wise participation, correlation matrix of returns, and sector donuts.
+*   **10 Documented Insights**: Authored markdown cells inside the notebook containing precise investment observations and direct chart references.
+*   **Dynamic Color Assignment**: Rewrote color mapping in `dashboard/app.js` with a dynamic hashing function `getSchemeColor()` to render 40 schemes beautifully in the UI.
+
+---
+
+This completes the end-to-end Mutual Fund Analytics project lifecycle, covering data acquisition, preprocessing, exploratory analysis, financial performance evaluation, risk assessment, database star schema loading, quantitative reporting, and dynamic dashboard developments.
+
