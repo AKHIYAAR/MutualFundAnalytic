@@ -36,6 +36,12 @@ def main():
             conn.execute(text("DROP TABLE IF EXISTS dim_date;"))
             conn.execute(text("DROP TABLE IF EXISTS dim_fund;"))
             
+            # Drop new EDA tables
+            conn.execute(text("DROP TABLE IF EXISTS fact_holdings;"))
+            conn.execute(text("DROP TABLE IF EXISTS dim_investor;"))
+            conn.execute(text("DROP TABLE IF EXISTS fact_market_stats;"))
+            conn.execute(text("DROP TABLE IF EXISTS fact_aum_growth;"))
+            
             # Old tables from Day 1/3 if any
             conn.execute(text("DROP TABLE IF EXISTS nav_history;"))
             conn.execute(text("DROP TABLE IF EXISTS fund_master;"))
@@ -52,6 +58,10 @@ def main():
     df_nav = pd.read_csv(nav_history_path)
     df_tx = pd.read_csv(transactions_path)
     df_perf = pd.read_csv(performance_path)
+    df_holdings = pd.read_csv("Data/processed/portfolio_holdings.csv")
+    df_demog = pd.read_csv("Data/processed/investor_demographics.csv")
+    df_market = pd.read_csv("Data/processed/market_statistics.csv")
+    df_aum_growth = pd.read_csv("Data/processed/aum_growth.csv")
 
     # 1. Standardise date formats in nav history to YYYY-MM-DD
     # Currently nav_history dates are DD-MM-YYYY
@@ -124,6 +134,20 @@ def main():
     df_aum_fact = df_aum_fact[['scheme_code', 'date_key', 'aum_amount']]
     df_aum_fact.to_sql("fact_aum", con=engine, if_exists="append", index=False)
 
+    # Load new EDA tables
+    print("Loading dim_investor...")
+    df_demog.to_sql("dim_investor", con=engine, if_exists="append", index=False)
+    
+    print("Loading fact_holdings...")
+    df_holdings_fact = df_holdings[['scheme_code', 'sector', 'weight_pct']]
+    df_holdings_fact.to_sql("fact_holdings", con=engine, if_exists="append", index=False)
+    
+    print("Loading fact_market_stats...")
+    df_market.to_sql("fact_market_stats", con=engine, if_exists="append", index=False)
+    
+    print("Loading fact_aum_growth...")
+    df_aum_growth.to_sql("fact_aum_growth", con=engine, if_exists="append", index=False)
+
     print("\nDatabase loaded successfully.")
     
     # 4. Verify row counts match source CSVs
@@ -137,7 +161,11 @@ def main():
         "fact_nav": len(df_nav_fact),
         "fact_transactions": len(df_tx_fact),
         "fact_performance": len(df_perf_fact),
-        "fact_aum": len(df_aum_fact)
+        "fact_aum": len(df_aum_fact),
+        "dim_investor": len(df_demog),
+        "fact_holdings": len(df_holdings),
+        "fact_market_stats": len(df_market),
+        "fact_aum_growth": len(df_aum_growth)
     }
     
     with engine.connect() as conn:

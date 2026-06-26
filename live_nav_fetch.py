@@ -23,6 +23,18 @@ def fetch_scheme_data(scheme_code, retries=3, backoff=3):
 def main():
     os.makedirs("Data/raw", exist_ok=True)
     
+    # Check if we already have the expanded 40 schemes dataset to preserve EDA data
+    master_path = "Data/raw/fund_master.csv"
+    if os.path.exists(master_path):
+        try:
+            df_m = pd.read_csv(master_path)
+            if len(df_m) >= 40:
+                print("Expanded dataset of 40 schemes detected in Data/raw/fund_master.csv.")
+                print("Skipping live API fetch to preserve 2022-2026 synchronized market cycle simulation.")
+                return
+        except Exception as e:
+            print(f"Error checking fund_master.csv: {e}")
+    
     # Schemes specified in the prompt
     prompt_schemes = {
         125497: "hdfc_top_100_125497.csv",  # (SBI Small Cap Fund on API)

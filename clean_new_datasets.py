@@ -175,6 +175,41 @@ def clean_performance():
     print(f"Cleaned performance shape: {df.shape}")
     print(f"Saved to {processed_path}")
 
+def copy_and_verify_eda_datasets():
+    print("=" * 60)
+    print("Processing EDA datasets (copy and verify)")
+    print("=" * 60)
+    
+    datasets = [
+        "portfolio_holdings.csv",
+        "investor_demographics.csv",
+        "market_statistics.csv",
+        "aum_growth.csv"
+    ]
+    
+    for filename in datasets:
+        raw_path = f"Data/raw/{filename}"
+        processed_path = f"Data/processed/{filename}"
+        
+        if not os.path.exists(raw_path):
+            print(f"Warning: {raw_path} not found.")
+            continue
+            
+        df = pd.read_csv(raw_path)
+        print(f"  - Loaded {filename}: Shape = {df.shape}")
+        
+        # Verify no critical missing values
+        missing = df.isnull().sum()
+        if missing.any():
+            print(f"    * Warning: Missing values in {filename}:")
+            print(missing[missing > 0])
+            df = df.dropna()
+            
+        os.makedirs(os.path.dirname(processed_path), exist_ok=True)
+        df.to_csv(processed_path, index=False)
+        print(f"    * Saved clean version to {processed_path}")
+
 if __name__ == "__main__":
     clean_transactions()
     clean_performance()
+    copy_and_verify_eda_datasets()

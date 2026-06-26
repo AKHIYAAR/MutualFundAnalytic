@@ -71,3 +71,46 @@ CREATE TABLE IF NOT EXISTS fact_aum (
 CREATE INDEX IF NOT EXISTS idx_fact_nav_scheme_date ON fact_nav(scheme_code, date_key);
 CREATE INDEX IF NOT EXISTS idx_fact_tx_scheme_date ON fact_transactions(scheme_code, date_key);
 CREATE INDEX IF NOT EXISTS idx_fact_aum_scheme_date ON fact_aum(scheme_code, date_key);
+
+-- 8. Dimension: Investor Demographics
+CREATE TABLE IF NOT EXISTS dim_investor (
+    investor_id TEXT PRIMARY KEY,
+    age_group TEXT NOT NULL CHECK (age_group IN ('18-25', '26-35', '36-45', '46-55', '56+')),
+    gender TEXT NOT NULL CHECK (gender IN ('Male', 'Female', 'Other')),
+    state TEXT NOT NULL,
+    city_tier TEXT NOT NULL CHECK (city_tier IN ('T30', 'B30')),
+    sip_amount REAL NOT NULL CHECK (sip_amount >= 0)
+);
+
+-- 9. Fact: Portfolio holdings and weights
+CREATE TABLE IF NOT EXISTS fact_holdings (
+    holding_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scheme_code INTEGER NOT NULL,
+    sector TEXT NOT NULL,
+    weight_pct REAL NOT NULL CHECK (weight_pct >= 0 AND weight_pct <= 100),
+    FOREIGN KEY (scheme_code) REFERENCES dim_fund(scheme_code)
+);
+
+-- 10. Fact: Monthly market-wide stats (SIP inflows & folios)
+CREATE TABLE IF NOT EXISTS fact_market_stats (
+    month TEXT PRIMARY KEY, -- 'YYYY-MM'
+    total_sip_inflow REAL NOT NULL CHECK (total_sip_inflow >= 0),
+    total_folios REAL NOT NULL CHECK (total_folios >= 0),
+    net_inflow_equity REAL NOT NULL,
+    net_inflow_debt REAL NOT NULL,
+    net_inflow_hybrid REAL NOT NULL,
+    net_inflow_other REAL NOT NULL
+);
+
+-- 11. Fact: Year-wise AUM growth by fund house
+CREATE TABLE IF NOT EXISTS fact_aum_growth (
+    aum_growth_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fund_house TEXT NOT NULL,
+    year INTEGER NOT NULL CHECK (year >= 2022 AND year <= 2025),
+    aum_lakh_cr REAL NOT NULL CHECK (aum_lakh_cr >= 0)
+);
+
+-- 12. Indexes for new tables
+CREATE INDEX IF NOT EXISTS idx_fact_holdings_scheme ON fact_holdings(scheme_code);
+CREATE INDEX IF NOT EXISTS idx_fact_aum_growth_house_year ON fact_aum_growth(fund_house, year);
+

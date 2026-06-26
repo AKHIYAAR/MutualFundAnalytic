@@ -45,8 +45,13 @@ def check_nav_anomalies(df):
     return anomalies
 
 def load_and_inspect_datasets():
-    csv_files = [f for f in glob.glob("Data/raw/*.csv") if os.path.basename(f) not in ['investor_transactions.csv', 'scheme_performance.csv']]
-    print(f"Found {len(csv_files)} CSV files in Data/raw/\n")
+    excluded_files = [
+        'investor_transactions.csv', 'scheme_performance.csv', 
+        'portfolio_holdings.csv', 'investor_demographics.csv', 
+        'market_statistics.csv', 'aum_growth.csv'
+    ]
+    csv_files = [f for f in glob.glob("Data/raw/*.csv") if os.path.basename(f) not in excluded_files]
+    print(f"Found {len(csv_files)} NAV CSV files in Data/raw/\n")
     
     inspection_results = {}
     
@@ -308,7 +313,12 @@ def clean_and_save_datasets():
     
     for filepath in csv_files:
         filename = os.path.basename(filepath)
-        if filename in ['fund_master.csv', 'nav_history.csv', 'investor_transactions.csv', 'scheme_performance.csv']:
+        excluded_files = [
+            'fund_master.csv', 'nav_history.csv', 'investor_transactions.csv', 
+            'scheme_performance.csv', 'portfolio_holdings.csv', 
+            'investor_demographics.csv', 'market_statistics.csv', 'aum_growth.csv'
+        ]
+        if filename in excluded_files:
             continue
             
         df = pd.read_csv(filepath)
